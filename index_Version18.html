@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>História Interativa — GPS da Vida</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <style>
+    html, body { margin:0; padding:0; background:#132b22; height:100%; overflow:hidden; }
+    body { width:100vw; height:100vh; }
+    canvas { display:block; width:100vw; height:60vh; background:#132b22; }
+    #caption {color:#ffe066; font-family:Georgia,serif; font-size:1.2em; text-align:center; margin:16px auto 10px auto; max-width:90vw;}
+    #controls {
+      margin:8px auto 0 auto; text-align:center; display:flex; justify-content:center; gap:12px;
+    }
+    #controls button {
+      font-size:1em; padding:8px 18px; background:#ffe066; border:none; border-radius:8px; font-weight:600;
+      color:#222; box-shadow:0 2px 12px #ffe06655; transition:background .2s; cursor:pointer;
+    }
+    #controls button:active { background:#ffd200; }
+    #menu-btn {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 60% 30%, #54a8ff 60%, #0e3a7a 100%);
+      box-shadow: 0 0 12px 2px #54a8ff88;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: none;
+      z-index: 20;
+    }
+    #menu-btn svg { width: 24px; height: 24px; fill: #fff; }
+    #menu-panel {
+      position: absolute;
+      top: 56px;
+      left: 16px;
+      min-width: 180px;
+      background: #fffbe7;
+      color: #222;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1em;
+      border-radius: 12px;
+      box-shadow: 0 4px 32px #54a8ff55;
+      z-index: 22;
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      overflow: hidden;
+      animation: fadeInMenu .3s;
+    }
+    @keyframes fadeInMenu {
+      from { opacity:0; transform: translateY(-10px); }
+      to { opacity:1; transform: translateY(0); }
+    }
+    #menu-panel button {
+      background: none;
+      border: none;
+      border-bottom: 1px solid #e2e2e2;
+      color: #2c5e32;
+      padding: 12px 18px;
+      text-align: left;
+      font-size: 1em;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #menu-panel button:last-child { border-bottom: none; }
+    #menu-panel button:hover {
+      background: #ffe06633;
+      color: #54a8ff;
+    }
+    @media (max-width: 900px) {
+      canvas {height:40vh;}
+      #caption { font-size:1em; padding:0 8px;}
+      #controls button { font-size:0.9em; padding:7px 10px;}
+      #menu-btn { width:30px; height:30px; top:6px; left:6px;}
+      #menu-btn svg { width:16px; height:16px;}
+      #menu-panel { top:38px; left:6px; min-width:90px; font-size:0.9em;}
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="600" height="400"></canvas>
+  <div id="caption"></div>
+  <button id="menu-btn" title="Menu">
+    <svg viewBox="0 0 32 32"><rect x="6" y="9" width="20" height="4"/><rect x="6" y="19" width="20" height="4"/></svg>
+  </button>
+  <div id="menu-panel"></div>
+  <div id="controls">
+    <button id="prevBtn">◀ Anterior</button>
+    <button id="playBtn">▶ Ouvir IA</button>
+    <button id="nextBtn">Próximo ▶</button>
+  </div>
+<script>
+const scenes = [
+  "Ele não via horas. Ele via o Pai multiplicando a luz. Cada semente de luz era um dia. Era assim que ele tocava o tempo.",
+  "O tempo crescia de dentro pra fora, feito árvore da alma. Ali nasceu a primeira contagem. Não era relógio, era altar.",
+  "E Deus disse: haja luz. Multiplique o Sol.",
+  "Tudo bem, filho. Vou te dar dica. Um, dois... quatro... E assim Adão começou a contar.",
+  "O despertar. Raízes sagradas sustentam a vida.",
+  "A luz se abre em portais secretos, guiando os passos pelo infinito. O caminho se revela para quem aprende a enxergar além dos números.",
+  "Do outro lado, o conhecimento floresce: códigos, mapas, mistérios. Cada descoberta é uma nova semente de esperança.",
+  "Dois amigos amarelo e azul se encontram na estrada. — E mesmo? — Era só seguir o GPS certo ao bisturi correto ali dali.",
+  "Human Vein. A tecnologia se une à mão da experiência. A vida pulsa entre ciência e arte.",
+  "O cubo gira no céu, resolvendo enigmas do destino. Cada cor, uma escolha. Cada giro, uma nova possibilidade.",
+  "A liberdade é azul, voando entre zeros e uns. O pássaro leva a mensagem: — E achamos liberdade!",
+  "Saitama surge segurando um GPS especial. Uma luz branca vai à frente, guiando pelo corpo humano. Luzes azuis percorrem veias e órgãos, algumas congelam, outras aquecem, devolvendo saúde e esperança às pessoas."
+];
+let current = 0;
+const captionDiv = document.getElementById('caption');
+captionDiv.textContent = scenes[current];
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+function resizeCanvas() {
+  let w = Math.min(window.innerWidth, 900);
+  let h = Math.min(window.innerHeight*0.6, 400);
+  canvas.width = w;
+  canvas.height = h;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function drawScene(stage, t) {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "#244d36";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Sol e sementes (Partes 1, 3)
+  if([0,2].includes(stage)) {
+    let cx = canvas.width/2, cy = canvas.height/3, r = 50+18*Math.sin(t/30);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,0,2*Math.PI);
+    ctx.fillStyle = "#ffe066";
+    ctx.shadowColor = "#ffe066";
+    ctx.shadowBlur = 40;
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.restore();
+    for(let i=0;i<12;i++) {
+      let angle = i*Math.PI/6+t/40;
+      let x = cx + Math.cos(angle)*120;
+      let y = cy + Math.sin(angle)*120;
+      ctx.beginPath();
+      ctx.arc(x, y, 16+8*Math.sin(t/60+i), 0, 2*Math.PI);
+      ctx.fillStyle="#ffd200";
+      ctx.globalAlpha=0.7;
+      ctx.fill();
+    }
+  }
+  // Árvore (Partes 2, 4, 5)
+  if([1,4].includes(stage)) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(canvas.width/2, canvas.height*0.82, 56, 30, 0, 0, 2*Math.PI);
+    ctx.fillStyle="#2e481d";
+    ctx.globalAlpha=0.7;
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(canvas.width/2, canvas.height*0.82);
+    ctx.lineTo(canvas.width/2-10, canvas.height*0.56);
+    ctx.lineTo(canvas.width/2+10, canvas.height*0.56);
+    ctx.closePath();
+    ctx.fillStyle="#a3703a";
+    ctx.globalAlpha=0.8;
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width/2, canvas.height*0.55, 44+12*Math.sin(t/21), 0, 2*Math.PI);
+    ctx.fillStyle="#268a56";
+    ctx.globalAlpha=0.7;
+    ctx.fill();
+    ctx.restore();
+  }
+  // Portal (Partes 5,6)
+  if([4,5].includes(stage)) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width/2, canvas.height/2, 62+20*Math.sin(t/15), 0, 2*Math.PI);
+    ctx.globalAlpha=0.48 + 0.19*Math.cos(t/19);
+    ctx.fillStyle="#5ec6ff";
+    ctx.shadowColor="#5ec6ff";
+    ctx.shadowBlur=40;
+    ctx.fill();
+    ctx.restore();
+  }
+  // Cubo (Partes 9,10)
+  if([9].includes(stage)) {
+    let cx = canvas.width/2, cy = canvas.height/2;
+    let size = 54+8*Math.sin(t/20);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.sin(t/40));
+    ctx.fillStyle="#ffd200";
+    ctx.fillRect(-size/2, -size/2, size, size);
+    ctx.strokeStyle="#268ad9";
+    ctx.lineWidth=6;
+    ctx.strokeRect(-size/2, -size/2, size, size);
+    ctx.restore();
+  }
+  // Pássaro (Partes 10,11)
+  if([10].includes(stage)) {
+    let px = canvas.width*0.7 + 30*Math.sin(t/25), py = canvas.height*0.4 + 20*Math.cos(t/28);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(px, py, 18, 10, Math.PI/8, 0, 2*Math.PI);
+    ctx.fillStyle="#68baff";
+    ctx.globalAlpha=0.8;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(px+12, py);
+    ctx.lineTo(px+22, py-8);
+    ctx.lineTo(px+8, py-3);
+    ctx.closePath();
+    ctx.fillStyle="#fff";
+    ctx.globalAlpha=0.6;
+    ctx.fill();
+    ctx.restore();
+  }
+  // Amigos (Partes 7,8)
+  if([7].includes(stage)) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width/2-40, canvas.height/2+40, 22+4*Math.sin(t/17), 0, 2*Math.PI);
+    ctx.fillStyle="#ffd200";
+    ctx.globalAlpha=0.8;
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(canvas.width/2+40, canvas.height/2+40, 22+4*Math.sin(t/19), 0, 2*Math.PI);
+    ctx.fillStyle="#54a8ff";
+    ctx.globalAlpha=0.8;
+    ctx.fill();
+    ctx.restore();
+  }
+  // Rede de veias e GPS (Cena final Saitama)
+  if(stage===11){
+    // Rede de veias
+    ctx.save();
+    ctx.strokeStyle="#eacb1e";
+    ctx.globalAlpha=0.12;
+    for(let i=0; i<25; i++) {
+      ctx.beginPath();
+      let x = canvas.width/2, y = canvas.height/2;
+      ctx.moveTo(x,y);
+      for(let j=0;j<5;j++){
+        x += Math.cos(t/30+Math.PI*i/12+j)*30;
+        y += Math.sin(t/30+Math.PI*i/16-j)*20;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Luz branca principal (GPS)
+    let gpsPath = [];
+    let gx = canvas.width*0.18, gy = canvas.height*0.45;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(gx,gy);
+    for(let i=0;i<6;i++) {
+      gx += 60+12*Math.sin(t/22+i);
+      gy += (i%2==0?1:-1)*(28+10*Math.cos(t/17+i));
+      gpsPath.push([gx,gy]);
+      ctx.lineTo(gx,gy);
+    }
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=7;
+    ctx.shadowColor="#fff";
+    ctx.shadowBlur=24;
+    ctx.globalAlpha=0.9;
+    ctx.stroke();
+    ctx.restore();
+    // Luz azul fria (seguindo GPS)
+    for(let k=0;k<gpsPath.length;k++){
+      let [x,y] = gpsPath[k];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x-18, y-6, 19+6*Math.sin(t/13+k), 0, 2*Math.PI);
+      ctx.fillStyle = "rgba(85,180,255,0.7)";
+      ctx.shadowColor="#5ec6ff";
+      ctx.shadowBlur=22;
+      ctx.globalAlpha=0.85;
+      ctx.fill();
+      ctx.restore();
+    }
+    // Luz azul quente (seguindo GPS)
+    for(let k=0;k<gpsPath.length;k++){
+      let [x,y] = gpsPath[k];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x+16, y+10, 17+5*Math.cos(t/11+k), 0, 2*Math.PI);
+      ctx.fillStyle = "rgba(90,175,255,0.7)";
+      ctx.shadowColor="#ffe066";
+      ctx.shadowBlur=18;
+      ctx.globalAlpha=0.65+0.2*Math.sin(t/23+k);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Saitama (simples, de costas, segurando GPS)
+    let sx = canvas.width*0.17, sy = canvas.height*0.48;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(sx,sy,32,62,0,0,2*Math.PI);
+    ctx.fillStyle="#f8e6d2";
+    ctx.globalAlpha=0.98;
+    ctx.shadowColor="#ffe066";
+    ctx.shadowBlur=10;
+    ctx.fill();
+    ctx.save();
+    ctx.translate(sx+10,sy+40);
+    ctx.rotate(-Math.PI/5);
+    ctx.beginPath();
+    ctx.ellipse(0,0,14,28,Math.PI/8,0,2*Math.PI);
+    ctx.fillStyle="#f8e6d2";
+    ctx.globalAlpha=0.98;
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(sx+25,sy+70);
+    ctx.rotate(Math.PI/15);
+    ctx.beginPath();
+    ctx.rect(-10,-13,26,22);
+    ctx.fillStyle="#fff";
+    ctx.shadowColor="#fff";
+    ctx.shadowBlur=10;
+    ctx.globalAlpha=0.87;
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  }
+}
+let t=0;
+function animLoop() {
+  t++;
+  drawScene(current, t);
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+
+// Narração IA
+function speak() {
+  if ('speechSynthesis' in window) {
+    let utter = new SpeechSynthesisUtterance(scenes[current]);
+    utter.lang = 'pt-BR';
+    utter.rate = 0.97;
+    window.speechSynthesis.speak(utter);
+  }
+}
+
+// CONTROLES
+document.getElementById('prevBtn').onclick = () => {
+  current = (current-1+scenes.length)%scenes.length;
+  captionDiv.textContent = scenes[current];
+};
+document.getElementById('nextBtn').onclick = () => {
+  current = (current+1)%scenes.length;
+  captionDiv.textContent = scenes[current];
+};
+document.getElementById('playBtn').onclick = () => speak();
+
+// MENU
+const menuBtn = document.getElementById('menu-btn');
+const menuPanel = document.getElementById('menu-panel');
+let menuVisible = false;
+function renderMenu() {
+  menuPanel.innerHTML = "";
+  scenes.forEach((scene, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = "Cena " + (idx+1);
+    btn.onclick = () => {
+      current = idx;
+      captionDiv.textContent = scenes[current];
+      menuPanel.style.display="none";
+      menuVisible = false;
+    };
+    menuPanel.appendChild(btn);
+  });
+}
+menuBtn.onclick = function() {
+  menuVisible = !menuVisible;
+  if(menuVisible) {
+    renderMenu();
+    menuPanel.style.display="flex";
+  } else {
+    menuPanel.style.display="none";
+  }
+};
+window.addEventListener("click", function(e){
+  if(menuVisible && !menuPanel.contains(e.target) && e.target!==menuBtn) {
+    menuPanel.style.display="none";
+    menuVisible = false;
+  }
+});
+</script>
+</body>
+</html>
